@@ -8,5 +8,5 @@ Local Mongo must contain a database named "todosmvc" containing a collection nam
 ```
 npm install
 go build
-.\todomvc.exe
+.\todomvcgo.exe
 ```
