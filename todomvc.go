@@ -9,15 +9,22 @@ const APIPREFIX string = "/api/todos/"
 
 func main() {
 
+	hub := newHub()
+	go hub.run()
+
 	handler := makeAPIHandler()
 
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		serveWs(hub, w, r)
+	})
 	mux.Handle("/api/todos/", handler)
 
 	mux.Handle("/", http.FileServer(http.Dir("./frontend")))
 
 	http.ListenAndServe(":8080", mux)
+
 }
 
 type apiHandler struct {

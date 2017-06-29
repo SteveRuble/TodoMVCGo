@@ -20,6 +20,12 @@ var app = app || {};
 
 	app.TodoModel.prototype.initAsync = function(key){
 		this.key = key;
+
+		this.bus = app.bus;
+		this.bus.init('ws://localhost:8080/ws');
+
+		window.bus = this.bus;
+
 		return Utils.storeAsync(key)
 			.then(function(data){ 
 				this.todos = data;
