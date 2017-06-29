@@ -2,81 +2,73 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"os"
 )
 
 const APIPREFIX string = "/api/todos/"
 
-func apiHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "API")
-}
-
 func main() {
 
-	initFrontEnd()
+	handler := makeAPIHandler()
 
-	initApi()
+	mux := http.NewServeMux()
 
-	http.ListenAndServe(":8080", nil)
+	mux.Handle("/api/todos/", handler)
+
+	mux.Handle("/", http.FileServer(http.Dir("./frontend")))
+
+	http.ListenAndServe(":8080", mux)
 }
 
-func initApi() {
+type apiHandler struct {
+	store todoStore
+}
+
+func makeAPIHandler() apiHandler {
 
 	connection := createConnection()
 
 	store := todoStore{primaryConnection: connection}
 
-	todosHandler := makeTodosHandler(store)
+	handler := apiHandler{store: store}
 
-	http.HandleFunc(APIPREFIX, todosHandler)
+	return handler
 }
 
-func initFrontEnd() {
-	wd, _ := os.Getwd()
-	dir := wd + "\\frontend\\"
-	fs := http.FileServer(http.Dir(dir))
-	http.Handle("/", fs)
-}
+func (a apiHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	encoder := json.NewEncoder(w)
 
-func makeTodosHandler(store todoStore) func(http.ResponseWriter, *http.Request) {
+	id := req.URL.Path[len(APIPREFIX):]
 
-	return func(w http.ResponseWriter, req *http.Request) {
-		encoder := json.NewEncoder(w)
-
-		id := req.URL.Path[len(APIPREFIX):]
-
-		switch req.Method {
-		case http.MethodGet:
-			{
-				todos, err := store.LoadTodos(id)
+	switch req.Method {
+	case http.MethodGet:
+		{
+			todos, err := a.store.LoadTodos(id)
+			if err != nil {
+				w.WriteHeader(http.StatusNotFound)
+			} else {
+				encoder.Encode(todos)
+			}
+		}
+	case http.MethodPost:
+		{
+			todos := []ApiTodo{}
+			decoder := json.NewDecoder(req.Body)
+			err := decoder.Decode(&todos)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+			} else {
+				err = a.store.SaveTodos(id, todos)
 				if err != nil {
-					w.WriteHeader(http.StatusNotFound)
+					w.WriteHeader(http.StatusInternalServerError)
 				} else {
-					encoder.Encode(todos)
+					w.WriteHeader(http.StatusAccepted)
 				}
 			}
-		case http.MethodPost:
-			{
-				todos := []ApiTodo{}
-				decoder := json.NewDecoder(req.Body)
-				err := decoder.Decode(&todos)
-				if err != nil {
-					w.WriteHeader(http.StatusBadRequest)
-				} else {
-					err = store.SaveTodos(id, todos)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-					} else {
-						w.WriteHeader(http.StatusAccepted)
-					}
-				}
-			}
-		default:
-			{
-				w.WriteHeader(http.StatusMethodNotAllowed)
-			}
+		}
+	default:
+		{
+			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	}
 }
