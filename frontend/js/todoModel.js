@@ -22,12 +22,12 @@ var app = app || {};
 		this.key = key;
 
 		this.bus = app.bus;
-		this.bus.init('ws://localhost:8080/ws');
+		this.bus.init('ws://127.0.0.1:8080/ws');
 
 		window.bus = this.bus;
 
 		return Utils.storeAsync(key)
-			.then(function(data){ 
+			.then(function(data){
 				this.todos = data;
 				this.onChanges.forEach(function (cb) { cb(); })
 			 }.bind(this));

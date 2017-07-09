@@ -2,28 +2,40 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 )
 
 const APIPREFIX string = "/api/todos/"
 
-func main() {
+// wsHandler implements the Handler Interface
+type wsHandler struct{}
 
-	hub := newHub()
-	go hub.run()
+func main() {
 
 	handler := makeAPIHandler()
 
+	hub := newHub()
+	channelFactory := makeSingleListCommandChannelFactory(handler.store.primaryConnection)
+	go hub.run(channelFactory)
+
 	mux := http.NewServeMux()
 
+	//ws := wsHandler{}
+
+	//mux.Handle("/ws", ws)
+
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
+		fmt.Println("got request")
 	})
+
 	mux.Handle("/api/todos/", handler)
 
 	mux.Handle("/", http.FileServer(http.Dir("./frontend")))
 
-	http.ListenAndServe(":8080", mux)
+	http.ListenAndServe("localhost:8080", mux)
 
 }
 
@@ -78,4 +90,22 @@ func (a apiHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	}
+}
+
+func (wsh wsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("got ws request")
+	// upgrader is needed to upgrade the HTTP Connection to a websocket Connection
+	upgrader := &websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	//Upgrading HTTP Connection to websocket connection
+	wsConn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Printf("error upgrading %s", err)
+		return
+	}
+	_ = wsConn
+	//handle your websockets with wsConn
 }
