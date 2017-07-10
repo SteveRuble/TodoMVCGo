@@ -5,8 +5,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
+	"fmt"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to the
@@ -80,10 +80,8 @@ func (h *Hub) run(pipelineFactory CommandChannelFactory) {
 				}
 			}
 		case message := <-h.broadcast:
-
-			command := TodoCommand{}
-			decoder := json.NewDecoder(bytes.NewReader(message))
-			err := decoder.Decode(&command)
+			var command TodoCommand
+			err := json.Unmarshal(message, &command)
 			if err == nil {
 				if store, ok := stores[command.ListID]; ok {
 					store <- command
@@ -96,10 +94,11 @@ func (h *Hub) run(pipelineFactory CommandChannelFactory) {
 						default:
 							close(client.Send)
 							delete(clients, client)
-							h.clients[command.ListID] = clients
 						}
 					}
 				}
+			} else {
+				fmt.Printf("couldn't decode message: %s", message)
 			}
 		}
 	}
